@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบติดตามคดีกองทุน (Debt)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ====== CSS VARIABLES ====== */
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f9f8f5;
+    --border: #e2e0da;
+    --border2: #d0cec7;
+    --text: #1a1917;
+    --text2: #6b6860;
+    --text3: #9b9890;
+    --accent: #1a56db;
+    --accent-light: #eff4ff;
+    --accent-dark: #1342b0;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --amber: #d97706;
+    --amber-light: #fffbeb;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --gray-light: #f3f2ef;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+    --shadow-lg: 0 20px 40px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.06);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --font: 'IBM Plex Sans Thai', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 15px; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  /* ====== TOPBAR ====== */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow-sm);
+  }
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+  .topbar-logo {
+    width: 34px; height: 34px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 16px;
+  }
+  .topbar-title h1 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .topbar-title p {
+    font-size: 0.75rem;
+    color: var(--text3);
+    margin-top: 1px;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .sync-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1.5px solid var(--border2);
+    background: var(--surface);
+    color: var(--text2);
+  }
+  .sync-badge.synced { border-color: #86efac; background: var(--green-light); color: var(--green); }
+  .sync-badge.syncing { border-color: #93c5fd; background: #eff6ff; color: var(--accent); }
+  .sync-badge.error { border-color: #fca5a5; background: var(--red-light); color: var(--red); }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .sync-badge.syncing .sync-dot { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .sync-time { font-size: 0.75rem; color: var(--text3); font-family: var(--mono); }
+
+  .btn-add {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.01em;
+  }
+  .btn-add:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn-add:active { transform: translateY(0); }
+
+  /* ====== MAIN CONTENT ====== */
+  .main { max-width: 1100px; margin: 0 auto; padding: 24px 28px 60px; }
+
+  /* ====== ALERT BANNER ====== */
+  .alert-banner {
+    background: var(--amber-light);
+    border: 1px solid #fde68a;
+    border-left: 3px solid var(--amber);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+  }
+  .alert-banner strong { color: var(--amber); }
+  .alert-item { margin-top: 4px; color: var(--text2); }
+
+  /* ====== STATS ====== */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    transition: box-shadow 0.2s;
+  }
+  .stat-card:hover { box-shadow: var(--shadow); }
+  .stat-label {
+    font-size: 0.78rem;
+    color: var(--text3);
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 6px;
+  }
+  .stat-label .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .stat-value { font-size: 1.8rem; font-weight: 700; letter-spacing: -0.03em; color: var(--text); }
+  .stat-card.overdue .stat-value { color: var(--red); }
+  .stat-card.upcoming .stat-value { color: var(--amber); }
+  .stat-card.normal .stat-value { color: var(--green); }
+
+  /* ====== TABLE SECTION ====== */
+  .table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .table-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .count-badge {
+    background: var(--accent);
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-family: var(--mono);
+  }
+  .filter-bar { display: flex; align-items: center; gap: 8px; }
+  .filter-btn {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    font-family: var(--font);
+    cursor: pointer;
+    border: 1.5px solid var(--border2);
+    background: var(--surface);
+    color: var(--text2);
+    transition: all 0.15s;
+  }
+  .filter-btn.active { background: var(--text); color: white; border-color: var(--text); }
+  .filter-btn:hover:not(.active) { border-color: var(--text3); }
+  .search-box {
+    position: relative; display: flex; align-items: center;
+  }
+  .search-box input {
+    padding: 5px 12px 5px 32px;
+    border: 1.5px solid var(--border2);
+    border-radius: 20px;
+    font-family: var(--font);
+    font-size: 0.78rem;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    width: 200px;
+    transition: border-color 0.15s, width 0.2s;
+  }
+  .search-box input:focus { border-color: var(--accent); width: 240px; }
+  .search-icon { position: absolute; left: 10px; color: var(--text3); font-size: 13px; pointer-events: none; }
+
+  /* ====== TABLE ====== */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  td {
+    padding: 13px 14px;
+    font-size: 0.85rem;
+    vertical-align: middle;
+  }
+  .td-num { color: var(--text3); font-family: var(--mono); font-size: 0.75rem; width: 36px; }
+  .case-name { font-weight: 600; color: var(--text); }
+  .case-sub { font-size: 0.75rem; color: var(--text3); margin-top: 2px; }
+  .status-text { color: var(--text2); font-size: 0.82rem; max-width: 180px; }
+  .next-text { color: var(--text3); font-size: 0.8rem; max-width: 160px; font-style: italic; }
+
+  /* Deadline pill */
+  .deadline-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    font-family: var(--mono);
+    white-space: nowrap;
+  }
+  .deadline-pill .pill-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .deadline-pill.overdue { background: var(--red-light); color: var(--red); }
+  .deadline-pill.upcoming { background: var(--amber-light); color: var(--amber); }
+  .deadline-pill.normal { background: var(--green-light); color: var(--green); }
+  .deadline-pill.none { background: var(--gray-light); color: var(--text3); }
+  .deadline-sub { font-size: 0.72rem; color: var(--text3); margin-top: 3px; font-family: var(--mono); }
+
+  /* Action buttons */
+  .action-cell { display: flex; gap: 6px; align-items: center; }
+  .btn-icon {
+    width: 30px; height: 30px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border2);
+    background: var(--surface);
+    color: var(--text2);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .btn-icon:hover { background: var(--surface2); border-color: var(--text3); color: var(--text); }
+  .btn-icon.edit:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+  .btn-icon.del:hover { border-color: var(--red); color: var(--red); background: var(--red-light); }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text3);
+  }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.4; }
+  .empty-state p { font-size: 0.9rem; }
+
+  /* Loading row */
+  .loading-row td {
+    text-align: center;
+    padding: 40px;
+    color: var(--text3);
+  }
+  .spinner {
+    display: inline-block;
+    width: 20px; height: 20px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ====== MODAL ====== */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(3px);
+    z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface);
+    border-radius: 14px;
+    width: 520px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    transform: scale(0.95) translateY(10px);
+    transition: transform 0.2s;
+    border: 1px solid var(--border);
+  }
+  .modal-overlay.open .modal { transform: scale(1) translateY(0); }
+  .modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--surface); z-index: 1;
+    border-radius: 14px 14px 0 0;
+  }
+  .modal-header h2 { font-size: 1rem; font-weight: 600; }
+  .btn-close {
+    width: 28px; height: 28px;
+    border: none; background: var(--surface2);
+    border-radius: 6px; cursor: pointer;
+    color: var(--text2); font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .btn-close:hover { background: var(--border); color: var(--text); }
+  .modal-body { padding: 20px 24px; }
+  .modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; gap: 10px;
+    position: sticky; bottom: 0; background: var(--surface);
+    border-radius: 0 0 14px 14px;
+  }
+
+  /* Form */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .form-group:last-child { margin-bottom: 0; }
+  label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  label .req { color: var(--red); }
+  input[type="text"], input[type="date"], select, textarea {
+    padding: 9px 12px;
+    border: 1.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--surface);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(26,86,219,0.1);
+  }
+  textarea { resize: vertical; min-height: 76px; line-height: 1.5; }
+  ::placeholder { color: var(--text3); }
+
+  .btn-cancel {
+    padding: 8px 18px;
+    border: 1.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 0.85rem;
+    background: var(--surface);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-cancel:hover { background: var(--surface2); border-color: var(--text3); }
+  .btn-save {
+    padding: 8px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: var(--accent);
+    color: white;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 7px;
+    transition: all 0.15s;
+  }
+  .btn-save:hover { background: var(--accent-dark); }
+  .btn-save:disabled { opacity: 0.6; pointer-events: none; }
+
+  /* Confirm dialog */
+  .confirm-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 300;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.15s;
+  }
+  .confirm-overlay.open { opacity: 1; pointer-events: all; }
+  .confirm-box {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 24px;
+    width: 360px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+    transform: scale(0.96); transition: transform 0.15s;
+  }
+  .confirm-overlay.open .confirm-box { transform: scale(1); }
+  .confirm-box h3 { font-size: 0.95rem; margin-bottom: 8px; }
+  .confirm-box p { font-size: 0.85rem; color: var(--text2); margin-bottom: 20px; }
+  .confirm-btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-danger {
+    padding: 7px 16px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--red);
+    color: white;
+    font-family: var(--font);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-danger:hover { opacity: 0.85; }
+
+  /* Toast */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 400; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--text);
+    color: white;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 500;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(8px);
+    animation: toastIn 0.2s forwards, toastOut 0.2s 2.8s forwards;
+    max-width: 300px;
+  }
+  .toast.success { background: #15803d; }
+  .toast.error { background: var(--red); }
+  @keyframes toastIn { to { opacity: 1; transform: translateY(0); } }
+  @keyframes toastOut { to { opacity: 0; transform: translateY(8px); } }
+
+  @media (max-width: 768px) {
+    .topbar { padding: 0 16px; }
+    .main { padding: 16px 16px 40px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .filter-bar { flex-wrap: wrap; }
+    .sync-time { display: none; }
+    table { font-size: 0.8rem; }
+    td, th { padding: 10px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<nav class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">⚖</div>
+    <div class="topbar-title">
+      <h1>ระบบติดตามคดีกองทุน (Debt)</h1>
+      <p>กรมสวัสดิการและคุ้มครองแรงงาน จ.นนทบุรี</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="sync-badge" id="syncBadge" onclick="syncData()" title="คลิกเพื่อซิงก์">
+      <div class="sync-dot"></div>
+      <span id="syncText">กำลังโหลด</span>
+    </div>
+    <div class="sync-time" id="syncTime">—</div>
+    <button class="btn-add" onclick="openModal()">
+      <span>+</span> เพิ่มคดีใหม่
+    </button>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- Alert Banner -->
+  <div class="alert-banner" id="alertBanner" style="display:none">
+    <strong>🟡 ใกล้ครบกำหนด <span id="alertCount">0</span> คดี:</strong>
+    <div id="alertList"></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label"><span class="dot" style="background:var(--text2)"></span> คดีทั้งหมด</div>
+      <div class="stat-value" id="statTotal">—</div>
+    </div>
+    <div class="stat-card overdue">
+      <div class="stat-label"><span class="dot" style="background:var(--red)"></span> เกินกำหนด</div>
+      <div class="stat-value" id="statOverdue">—</div>
+    </div>
+    <div class="stat-card upcoming">
+      <div class="stat-label"><span class="dot" style="background:var(--amber)"></span> ใกล้ครบกำหนด (≤7 วัน)</div>
+      <div class="stat-value" id="statUpcoming">—</div>
+    </div>
+    <div class="stat-card normal">
+      <div class="stat-label"><span class="dot" style="background:var(--green)"></span> ปกติ</div>
+      <div class="stat-value" id="statNormal">—</div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-header">
+    <div class="table-title">
+      รายการคดี
+      <span class="count-badge" id="tableCount">0 คดี</span>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">ทั้งหมด</button>
+      <button class="filter-btn" data-filter="overdue" onclick="setFilter('overdue',this)">เกินกำหนด</button>
+      <button class="filter-btn" data-filter="upcoming" onclick="setFilter('upcoming',this)">ใกล้ครบ</button>
+      <button class="filter-btn" data-filter="normal" onclick="setFilter('normal',this)">ปกติ</button>
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="ค้นหาชื่อคดี / นายจ้าง..." oninput="renderTable()">
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>ชื่อคดี / ชื่อนายจ้าง</th>
+          <th>สถานะปัจจุบัน</th>
+          <th>NEXT STEPS</th>
+          <th>กำหนดเวลา</th>
+          <th>จัดการ</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr class="loading-row">
+          <td colspan="6"><span class="spinner"></span> กำลังโหลดข้อมูล...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">เพิ่มคดีใหม่</h2>
+      <button class="btn-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>เลขที่คดี / รหัสอ้างอิง</label>
+          <input type="text" id="fCaseNumber" placeholder="เช่น นบ.001/68">
+        </div>
+        <div class="form-group">
+          <label>ชื่อนายจ้าง / บริษัท <span class="req">*</span></label>
+          <input type="text" id="fEmployerName" placeholder="ชื่อบริษัทหรือนายจ้าง">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>สถานะปัจจุบัน <span class="req">*</span></label>
+        <textarea id="fCurrentStatus" placeholder="กรอกสถานะและรายละเอียดคดีปัจจุบัน"></textarea>
+      </div>
+      <div class="form-group">
+        <label>NEXT STEPS <span class="req">*</span></label>
+        <textarea id="fNextSteps" placeholder="เช่น จัดทำหนังสือเตือนครั้งที่ 2"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>กำหนดเวลา</label>
+          <input type="date" id="fDeadline">
+        </div>
+        <div class="form-group">
+          <label>ประเภทคดี</label>
+          <select id="fCaseType">
+            <option value="กองทุนสงเคราะห์">กองทุนสงเคราะห์</option>
+            <option value="กองทุนประกันสังคม">กองทุนประกันสังคม</option>
+            <option value="กองทุนเงินทดแทน">กองทุนเงินทดแทน</option>
+            <option value="อื่นๆ">อื่นๆ</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>หมายเหตุ</label>
+        <textarea id="fNotes" placeholder="บันทึกเพิ่มเติม (ไม่บังคับ)" style="min-height:60px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">ยกเลิก</button>
+      <button class="btn-save" id="btnSave" onclick="saveCase()">
+        💾 บันทึกคดี
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <h3>🗑 ลบคดีนี้?</h3>
+    <p id="confirmMsg">คุณต้องการลบคดีนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถยกเลิกได้</p>
+    <div class="confirm-btns">
+      <button class="btn-cancel" onclick="closeConfirm()">ยกเลิก</button>
+      <button class="btn-danger" id="btnConfirmDelete">ลบคดี</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ============================================================
+// CONFIG — แก้ไข SCRIPT_URL ให้ตรงกับ Apps Script Web App URL
+// ============================================================
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzuh0RLowJemPQSmKlWxJoWhmZzHjn2pVFN4lilClmDtmArCHM4VNZx7VHP9eOKiCX4ww/exec";
+// ตัวอย่าง: "https://script.google.com/macros/s/AKfycby.../exec"
+
+// ============================================================
+// STATE
+// ============================================================
+let cases = [];
+let currentFilter = "all";
+let editingId = null;
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener("DOMContentLoaded", () => {
+  loadCases();
+  // ซิงก์อัตโนมัติทุก 5 นาที
+  setInterval(loadCases, 5 * 60 * 1000);
+});
+
+// ============================================================
+// API CALLS — ใช้ GET เท่านั้น (workaround CORS)
+// ============================================================
+async function apiCall(params) {
+  const url = new URL(SCRIPT_URL);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ============================================================
+// LOAD / SYNC
+// ============================================================
+async function loadCases() {
+  setSyncState("syncing", "กำลังซิงก์...");
+  try {
+    const data = await apiCall({ action: "getAll" });
+    if (!data.success) throw new Error(data.error);
+    cases = data.cases || [];
+    renderAll();
+    const now = new Date();
+    document.getElementById("syncTime").textContent = 
+      `ซิงก์ ${now.toLocaleDateString("th-TH", {weekday:"short",day:"numeric",month:"short"})} ${now.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"})}`;
+    setSyncState("synced", "ซิงก์แล้ว");
+  } catch (err) {
+    setSyncState("error", "ซิงก์ไม่สำเร็จ");
+    showToast("ไม่สามารถเชื่อมต่อได้ กรุณาตรวจสอบ Script URL", "error");
+    console.error(err);
+    // ถ้า load ครั้งแรกไม่ได้ ให้แสดงตารางว่าง
+    if (cases.length === 0) renderAll();
+  }
+}
+
+async function syncData() { await loadCases(); }
+
+function setSyncState(state, text) {
+  const badge = document.getElementById("syncBadge");
+  const span = document.getElementById("syncText");
+  badge.className = "sync-badge " + state;
+  span.textContent = text;
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderAll() {
+  renderStats();
+  renderAlerts();
+  renderTable();
+}
+
+function getDeadlineStatus(deadline) {
+  if (!deadline) return "none";
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(deadline); d.setHours(0,0,0,0);
+  const diff = Math.round((d - today) / 86400000);
+  if (diff < 0) return "overdue";
+  if (diff <= 7) return "upcoming";
+  return "normal";
+}
+
+function getDayDiff(deadline) {
+  if (!deadline) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(deadline); d.setHours(0,0,0,0);
+  return Math.round((d - today) / 86400000);
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleDateString("th-TH", {day:"numeric", month:"short", year:"numeric"});
+}
+
+function renderStats() {
+  const total = cases.length;
+  const overdue = cases.filter(c => getDeadlineStatus(c.deadline) === "overdue").length;
+  const upcoming = cases.filter(c => getDeadlineStatus(c.deadline) === "upcoming").length;
+  const normal = cases.filter(c => getDeadlineStatus(c.deadline) === "normal").length;
+  document.getElementById("statTotal").textContent = total;
+  document.getElementById("statOverdue").textContent = overdue;
+  document.getElementById("statUpcoming").textContent = upcoming;
+  document.getElementById("statNormal").textContent = normal;
+}
+
+function renderAlerts() {
+  const upcoming = cases.filter(c => {
+    const s = getDeadlineStatus(c.deadline);
+    return s === "upcoming" || s === "overdue";
+  });
+  const banner = document.getElementById("alertBanner");
+  if (upcoming.length === 0) { banner.style.display = "none"; return; }
+  banner.style.display = "block";
+  document.getElementById("alertCount").textContent = upcoming.length;
+  const list = document.getElementById("alertList");
+  list.innerHTML = upcoming.map(c => {
+    const diff = getDayDiff(c.deadline);
+    const label = diff < 0 ? `เกินกำหนด ${Math.abs(diff)} วัน` : diff === 0 ? "วันนี้!" : `อีก ${diff} วัน`;
+    return `<div class="alert-item">• ${c.employerName} — ${formatDate(c.deadline)} (${label})</div>`;
+  }).join("");
+}
+
+function renderTable() {
+  const search = document.getElementById("searchInput").value.trim().toLowerCase();
+  let filtered = cases.filter(c => {
+    const matchFilter = currentFilter === "all" || getDeadlineStatus(c.deadline) === currentFilter;
+    const matchSearch = !search || 
+      (c.employerName||"").toLowerCase().includes(search) || 
+      (c.caseNumber||"").toLowerCase().includes(search) ||
+      (c.currentStatus||"").toLowerCase().includes(search);
+    return matchFilter && matchSearch;
+  });
+
+  document.getElementById("tableCount").textContent = `${filtered.length} คดี`;
+  const tbody = document.getElementById("tableBody");
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6">
+      <div class="empty-state">
+        <div class="icon">📂</div>
+        <p>${cases.length === 0 ? "ยังไม่มีคดี กดปุ่ม + เพิ่มคดีใหม่" : "ไม่พบคดีที่ตรงกับเงื่อนไข"}</p>
+      </div>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((c, i) => {
+    const status = getDeadlineStatus(c.deadline);
+    const diff = getDayDiff(c.deadline);
+    let pillHtml = "";
+    if (c.deadline) {
+      const label = formatDate(c.deadline);
+      const sub = diff === null ? "" : diff < 0 ? `เกิน ${Math.abs(diff)} วัน` : diff === 0 ? "วันนี้!" : `อีก ${diff} วัน`;
+      pillHtml = `<div class="deadline-pill ${status}"><div class="pill-dot"></div>${label}</div>
+        ${sub ? `<div class="deadline-sub">${sub}</div>` : ""}`;
+    } else {
+      pillHtml = `<div class="deadline-pill none"><div class="pill-dot"></div>ไม่ระบุ</div>`;
+    }
+
+    const nextHtml = c.nextSteps 
+      ? `<div class="next-text">${escHtml(c.nextSteps)}</div>` 
+      : `<span style="color:var(--text3)">—</span>`;
+
+    return `<tr>
+      <td class="td-num">${i+1}</td>
+      <td>
+        <div class="case-name">${escHtml(c.employerName || "—")}</div>
+        ${c.caseNumber ? `<div class="case-sub">· ${escHtml(c.caseNumber)}</div>` : ""}
+        ${c.caseType ? `<div class="case-sub" style="margin-top:1px">📁 ${escHtml(c.caseType)}</div>` : ""}
+      </td>
+      <td><div class="status-text">${escHtml(c.currentStatus || "—")}</div></td>
+      <td>${nextHtml}</td>
+      <td>${pillHtml}</td>
+      <td>
+        <div class="action-cell">
+          <button class="btn-icon edit" onclick="openEditModal('${c.id}')" title="แก้ไข">✏️</button>
+          <button class="btn-icon del" onclick="openConfirmDelete('${c.id}')" title="ลบ">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+function escHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderTable();
+}
+
+// ============================================================
+// MODAL — ADD
+// ============================================================
+function openModal() {
+  editingId = null;
+  document.getElementById("modalTitle").textContent = "เพิ่มคดีใหม่";
+  document.getElementById("btnSave").innerHTML = "💾 บันทึกคดี";
+  clearForm();
+  document.getElementById("modalOverlay").classList.add("open");
+  setTimeout(() => document.getElementById("fEmployerName").focus(), 200);
+}
+
+function openEditModal(id) {
+  const c = cases.find(x => x.id === id);
+  if (!c) return;
+  editingId = id;
+  document.getElementById("modalTitle").textContent = "แก้ไขคดี";
+  document.getElementById("btnSave").innerHTML = "💾 บันทึกการแก้ไข";
+  document.getElementById("fCaseNumber").value = c.caseNumber || "";
+  document.getElementById("fEmployerName").value = c.employerName || "";
+  document.getElementById("fCurrentStatus").value = c.currentStatus || "";
+  document.getElementById("fNextSteps").value = c.nextSteps || "";
+  document.getElementById("fDeadline").value = c.deadline || "";
+  document.getElementById("fCaseType").value = c.caseType || "กองทุนสงเคราะห์";
+  document.getElementById("fNotes").value = c.notes || "";
+  document.getElementById("modalOverlay").classList.add("open");
+}
+
+function closeModal() {
+  document.getElementById("modalOverlay").classList.remove("open");
+  editingId = null;
+}
+
+function clearForm() {
+  ["fCaseNumber","fEmployerName","fCurrentStatus","fNextSteps","fDeadline","fNotes"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("fCaseType").value = "กองทุนสงเคราะห์";
+}
+
+// ============================================================
+// SAVE (ADD / UPDATE)
+// ============================================================
+async function saveCase() {
+  const employerName = document.getElementById("fEmployerName").value.trim();
+  const currentStatus = document.getElementById("fCurrentStatus").value.trim();
+  const nextSteps = document.getElementById("fNextSteps").value.trim();
+
+  if (!employerName) { showToast("กรุณากรอกชื่อนายจ้าง / บริษัท", "error"); return; }
+  if (!currentStatus) { showToast("กรุณากรอกสถานะปัจจุบัน", "error"); return; }
+  if (!nextSteps) { showToast("กรุณากรอก Next Steps", "error"); return; }
+
+  const params = {
+    caseNumber: document.getElementById("fCaseNumber").value.trim(),
+    employerName,
+    currentStatus,
+    nextSteps,
+    deadline: document.getElementById("fDeadline").value,
+    caseType: document.getElementById("fCaseType").value,
+    notes: document.getElementById("fNotes").value.trim()
+  };
+
+  const btn = document.getElementById("btnSave");
+  btn.disabled = true;
+  btn.innerHTML = "⏳ กำลังบันทึก...";
+
+  try {
+    let res;
+    if (editingId) {
+      res = await apiCall({ action: "update", id: editingId, ...params });
+    } else {
+      res = await apiCall({ action: "add", ...params });
+    }
+    if (!res.success) throw new Error(res.error);
+    showToast(editingId ? "✅ แก้ไขคดีเรียบร้อย" : "✅ เพิ่มคดีเรียบร้อย", "success");
+    closeModal();
+    await loadCases();
+  } catch (err) {
+    showToast("เกิดข้อผิดพลาด: " + err.message, "error");
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = editingId ? "💾 บันทึกการแก้ไข" : "💾 บันทึกคดี";
+  }
+}
+
+// ============================================================
+// DELETE
+// ============================================================
+let deletingId = null;
+function openConfirmDelete(id) {
+  const c = cases.find(x => x.id === id);
+  if (!c) return;
+  deletingId = id;
+  document.getElementById("confirmMsg").textContent = 
+    `ต้องการลบคดี "${c.employerName}" ใช่หรือไม่? การดำเนินการนี้ไม่สามารถยกเลิกได้`;
+  document.getElementById("btnConfirmDelete").onclick = confirmDelete;
+  document.getElementById("confirmOverlay").classList.add("open");
+}
+function closeConfirm() {
+  document.getElementById("confirmOverlay").classList.remove("open");
+  deletingId = null;
+}
+async function confirmDelete() {
+  if (!deletingId) return;
+  const btn = document.getElementById("btnConfirmDelete");
+  btn.textContent = "กำลังลบ..."; btn.disabled = true;
+  try {
+    const res = await apiCall({ action: "delete", id: deletingId });
+    if (!res.success) throw new Error(res.error);
+    showToast("🗑 ลบคดีเรียบร้อย", "success");
+    closeConfirm();
+    await loadCases();
+  } catch (err) {
+    showToast("ลบไม่สำเร็จ: " + err.message, "error");
+  } finally {
+    btn.textContent = "ลบคดี"; btn.disabled = false;
+  }
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type="") {
+  const c = document.getElementById("toastContainer");
+  const t = document.createElement("div");
+  t.className = "toast " + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+// ============================================================
+// CLOSE ON BACKDROP CLICK
+// ============================================================
+document.getElementById("modalOverlay").addEventListener("click", function(e) {
+  if (e.target === this) closeModal();
+});
+document.getElementById("confirmOverlay").addEventListener("click", function(e) {
+  if (e.target === this) closeConfirm();
+});
+</script>
+</body>
+</html>
